@@ -1,6 +1,24 @@
-version: "1.0"
+version: 0.5.0
 name: 智能问数Agent（优化版）
 description: 支持数据查询、图表生成、报告生成，可反问澄清、多轮对话及历史数据对比
+mode: workflow
+features:
+  file_upload:
+    allowed_file_uploads: false
+    allowed_file_extensions: []
+    allowed_file_upload_count: 3
+    allowed_file_size: 10
+    file_upload_method: disabled
+  opening_statement: ""
+  suggested_questions: []
+  speech_to_text:
+    enabled: false
+  text_to_speech:
+    enabled: false
+    voice: ""
+  interaction_mode: conversation
+  sensitive_word_avoidance:
+    enabled: false
 variables:
   - id: intent
     name: 用户意图
@@ -208,7 +226,7 @@ nodes:
       factory: "{{#conversation.factory#}}"
       indicator: "{{#conversation.indicator#}}"
       time_range: "{{#conversation.time_range#}}"
-      chart_type: "auto" # 自动根据数据类型选择图表（数值趋势用折线，分类对比用柱状）
+      chart_type: "auto"
     next: chart_reply
   - id: chart_reply
     type: reply
