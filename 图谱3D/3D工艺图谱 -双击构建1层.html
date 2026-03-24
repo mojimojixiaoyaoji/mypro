@@ -50,10 +50,6 @@ body::after{content:'';position:fixed;top:0;left:0;width:100%;height:100%;backgr
 .control-panel:hover{border-color:rgba(100,200,255,0.4);box-shadow:0 8px 32px rgba(0,0,0,0.8),0 0 20px rgba(110,180,255,0.1)}
 
 .control-buttons{display:flex;flex-direction:column;gap:6px}
-.expand-btn{position:fixed;width:20px;height:20px;border-radius:4px;background:rgba(5,10,30,0.85);color:#6eb5ff;font-size:14px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1000;box-shadow:0 0 10px rgba(110,180,255,0.3),inset 0 0 8px rgba(110,180,255,0.15);border:1px solid rgba(100,200,255,0.4);transition:all 0.3s ease;line-height:1}
-.expand-btn:hover{background:rgba(15,25,50,0.95);color:#00d4ff;box-shadow:0 0 15px rgba(0,212,255,0.5),inset 0 0 12px rgba(0,212,255,0.2);border-color:rgba(0,212,255,0.6);transform:scale(1.1)}
-.expand-btn.collapsed{color:#ff6b9d;box-shadow:0 0 10px rgba(255,107,157,0.3),inset 0 0 8px rgba(255,107,157,0.15);border-color:rgba(255,107,157,0.4)}
-.expand-btn.collapsed:hover{color:#ff8fba;box-shadow:0 0 15px rgba(255,107,157,0.5),inset 0 0 12px rgba(255,107,157,0.2);border-color:rgba(255,107,157,0.6)}
 
 .control-btn{width:42px;height:42px;border:none;border-radius:10px;background:linear-gradient(135deg,rgba(100,200,255,0.15),rgba(100,200,255,0.05));color:#6eb5ff;font-size:16px;cursor:pointer;transition:all 0.25s ease;display:flex;align-items:center;justify-content:center;border:1px solid rgba(100,200,255,0.2)}
 
@@ -350,7 +346,7 @@ controls.dampingFactor = 0.05
 controls.minDistance = 15
 controls.maxDistance = 80
 controls.autoRotate = true
-controls.autoRotateSpeed = 0.1
+controls.autoRotateSpeed = 0.3
 
 const ambientLight = new THREE.AmbientLight(0x202040, 0.3)
 scene.add(ambientLight)
@@ -766,7 +762,6 @@ relations.forEach((rel, idx) => {
     const start = new THREE.Vector3(nodes[rel.from].x, nodes[rel.from].y, nodes[rel.from].z)
     const end = new THREE.Vector3(nodes[rel.to].x, nodes[rel.to].y, nodes[rel.to].z)
     const relType = relationTypes[rel.type]
-    const fromColor = colors[nodes[rel.from].type]
     
     const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5)
     const distance = start.distanceTo(end)
@@ -782,7 +777,7 @@ relations.forEach((rel, idx) => {
                      1
     
     const mat = new THREE.LineBasicMaterial({
-        color: fromColor,
+        color: relType.color,
         transparent: true,
         opacity: 0.6,
         linewidth: lineWidth
@@ -793,7 +788,7 @@ relations.forEach((rel, idx) => {
 
     const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.05, 8, false)
     const tubeMat = new THREE.MeshBasicMaterial({
-        color: fromColor,
+        color: relType.color,
         transparent: true,
         opacity: 0.3,
         blending: THREE.AdditiveBlending
@@ -849,8 +844,6 @@ let hoveredMesh = null
 let selectedMesh = null
 let dblclickFocused = false
 let dblclickSelectedIndex = -1
-let expandedNodes = new Set()
-let expandButtons = []
 let isDragging = false
 let dragPlane = new THREE.Plane()
 let dragOffset = new THREE.Vector3()
@@ -918,279 +911,6 @@ function updateRelationLine(relIndex) {
     if (relLabel) {
         relLabel.position.set(mid.x, mid.y, mid.z)
     }
-}
-
-function createExpandButtons(centerIndex, connectedNodes) {
-    clearExpandButtons()
-    
-    connectedNodes.forEach(nodeIdx => {
-        if (nodeIdx === centerIndex) return
-        createButtonForNode(nodeIdx)
-    })
-}
-
-function createButtonForNode(nodeIdx) {
-    const hasChildren = relations.some(rel => rel.from === nodeIdx)
-    
-    if (hasChildren) {
-        const mesh = meshes[nodeIdx]
-        if (mesh) {
-            const btn = document.createElement('div')
-            btn.className = 'expand-btn'
-            
-            const isExpanded = expandedNodes.has(nodeIdx)
-            btn.textContent = isExpanded ? '−' : '+'
-            btn.dataset.nodeIndex = nodeIdx
-            btn.title = isExpanded ? '收起' : '展开'
-            
-            if (isExpanded) {
-                btn.classList.add('collapsed')
-            }
-            
-            const screenPos = getScreenPosition(mesh.position)
-            btn.style.left = (screenPos.x + 25) + 'px'
-            btn.style.top = (screenPos.y - 10) + 'px'
-            
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation()
-                handleExpandClick(nodeIdx)
-            })
-            
-            document.body.appendChild(btn)
-            expandButtons.push({ element: btn, nodeIndex: nodeIdx })
-        }
-    }
-}
-
-function handleExpandClick(nodeIndex) {
-    if (dblclickFocused) {
-        toggleExpand(nodeIndex)
-    } else {
-        if (expandedNodes.has(nodeIndex)) {
-            expandedNodes.delete(nodeIndex)
-        } else {
-            expandedNodes.add(nodeIndex)
-        }
-        refreshGraph()
-    }
-    updateExpandButtonStates()
-}
-
-function refreshGraph() {
-    const visibleNodes = new Set()
-    
-    if (dblclickFocused && dblclickSelectedIndex !== -1) {
-        visibleNodes.add(dblclickSelectedIndex)
-        
-        relations.forEach(rel => {
-            if (rel.from === dblclickSelectedIndex) visibleNodes.add(rel.to)
-            if (rel.to === dblclickSelectedIndex) visibleNodes.add(rel.from)
-        })
-        
-        expandedNodes.forEach(expandedIdx => {
-            relations.forEach(rel => {
-                if (rel.from === expandedIdx) visibleNodes.add(rel.to)
-                if (rel.to === expandedIdx) visibleNodes.add(rel.from)
-            })
-        })
-    }
-    
-    meshes.forEach((mesh, idx) => {
-        if (dblclickFocused) {
-            mesh.visible = visibleNodes.has(idx)
-        } else {
-            mesh.visible = true
-        }
-    })
-    
-    group.children.forEach(child => {
-        if (child.userData && (child.userData.relationType || child.userData.curve)) {
-            const relIndex = child.userData.relationIndex
-            const rel = relations[relIndex]
-            if (dblclickFocused) {
-                child.visible = visibleNodes.has(rel.from) && visibleNodes.has(rel.to)
-            } else {
-                child.visible = true
-            }
-        }
-        else if (child instanceof THREE.CSS2DObject && child.element && child.element.className === 'relation-label') {
-            if (child.userData && child.userData.relationIndex !== undefined) {
-                const rel = relations[child.userData.relationIndex]
-                if (dblclickFocused) {
-                    child.visible = visibleNodes.has(rel.from) && visibleNodes.has(rel.to)
-                } else {
-                    child.visible = true
-                }
-            }
-        }
-    })
-    
-    labelObjs.forEach((label, idx) => {
-        if (dblclickFocused) {
-            label.visible = visibleNodes.has(idx)
-        } else {
-            label.visible = true
-        }
-    })
-}
-
-function updateExpandButtonStates() {
-    expandButtons.forEach(btn => {
-        const isExpanded = expandedNodes.has(btn.nodeIndex)
-        btn.element.textContent = isExpanded ? '−' : '+'
-        btn.element.title = isExpanded ? '收起' : '展开'
-        
-        if (isExpanded) {
-            btn.element.classList.add('collapsed')
-        } else {
-            btn.element.classList.remove('collapsed')
-        }
-    })
-}
-
-function clearExpandButtons() {
-    expandButtons.forEach(btn => {
-        if (btn.element && btn.element.parentNode) {
-            btn.element.parentNode.removeChild(btn.element)
-        }
-    })
-    expandButtons = []
-}
-
-function toggleExpand(nodeIndex) {
-    if (expandedNodes.has(nodeIndex)) {
-        expandedNodes.delete(nodeIndex)
-        collapseNode(nodeIndex)
-    } else {
-        expandedNodes.add(nodeIndex)
-        expandNode(nodeIndex)
-    }
-    updateExpandButtons()
-}
-
-function expandNode(nodeIndex) {
-    const childNodes = new Set()
-    relations.forEach(rel => {
-        if (rel.from === nodeIndex) childNodes.add(rel.to)
-    })
-    
-    meshes.forEach((mesh, idx) => {
-        if (childNodes.has(idx)) {
-            mesh.visible = true
-            mesh.material.opacity = 0.9
-            mesh.material.emissiveIntensity = 0.5
-            mesh.material.emissive.setHex(colors[nodes[idx].type])
-            if (glowMeshes[idx]) {
-                glowMeshes[idx].visible = true
-                glowMeshes[idx].material.opacity = 0.2
-                glowMeshes[idx].material.color.setHex(colors[nodes[idx].type])
-            }
-        }
-    })
-    
-    childNodes.forEach(idx => {
-        if (labelObjs[idx]) {
-            labelObjs[idx].visible = true
-        }
-    })
-    
-    const relatedRelIndices = new Set()
-    relations.forEach((rel, idx) => {
-        if (rel.from === nodeIndex) relatedRelIndices.add(idx)
-    })
-    
-    group.children.forEach(child => {
-        if (child.userData && (child.userData.relationType || child.userData.curve)) {
-            const relIndex = child.userData.relationIndex
-            if (relatedRelIndices.has(relIndex)) {
-                child.visible = true
-            }
-        }
-        else if (child instanceof THREE.CSS2DObject && child.element && child.element.className === 'relation-label') {
-            if (child.userData && child.userData.relationIndex !== undefined) {
-                child.visible = relatedRelIndices.has(child.userData.relationIndex)
-            }
-        }
-    })
-}
-
-function collapseNode(nodeIndex) {
-    const childNodes = new Set()
-    relations.forEach(rel => {
-        if (rel.from === nodeIndex) childNodes.add(rel.to)
-    })
-    
-    meshes.forEach((mesh, idx) => {
-        if (childNodes.has(idx)) {
-            mesh.visible = false
-            if (glowMeshes[idx]) {
-                glowMeshes[idx].visible = false
-            }
-        }
-    })
-    
-    childNodes.forEach(idx => {
-        if (labelObjs[idx]) {
-            labelObjs[idx].visible = false
-        }
-    })
-    
-    const relatedRelIndices = new Set()
-    relations.forEach((rel, idx) => {
-        if (rel.from === nodeIndex) relatedRelIndices.add(idx)
-    })
-    
-    group.children.forEach(child => {
-        if (child.userData && (child.userData.relationType || child.userData.curve)) {
-            const relIndex = child.userData.relationIndex
-            if (relatedRelIndices.has(relIndex)) {
-                child.visible = false
-            }
-        }
-        else if (child instanceof THREE.CSS2DObject && child.element && child.element.className === 'relation-label') {
-            if (child.userData && child.userData.relationIndex !== undefined) {
-                child.visible = false
-            }
-        }
-    })
-}
-
-function updateExpandButtons() {
-    expandButtons.forEach(btn => {
-        if (expandedNodes.has(btn.nodeIndex)) {
-            btn.element.textContent = '−'
-            btn.element.classList.add('collapsed')
-            btn.element.title = '收起实体'
-        } else {
-            btn.element.textContent = '+'
-            btn.element.classList.remove('collapsed')
-            btn.element.title = '展开更多实体'
-        }
-    })
-}
-
-function getScreenPosition(position) {
-    const vector = position.clone()
-    vector.project(camera)
-    
-    return {
-        x: (vector.x * 0.5 + 0.5) * window.innerWidth,
-        y: (-vector.y * 0.5 + 0.5) * window.innerHeight
-    }
-}
-
-function updateExpandButtonPositions() {
-    expandButtons.forEach(btn => {
-        const mesh = meshes[btn.nodeIndex]
-        if (mesh && mesh.visible) {
-            const screenPos = getScreenPosition(mesh.position)
-            btn.element.style.left = (screenPos.x + 30) + 'px'
-            btn.element.style.top = (screenPos.y - 12) + 'px'
-            btn.element.style.display = 'flex'
-        } else {
-            btn.element.style.display = 'none'
-        }
-    })
 }
 
 window.addEventListener("mousedown", e => {
@@ -1278,22 +998,18 @@ window.addEventListener("dblclick", e => {
                 mesh.visible = true
                 mesh.material.opacity = 1
                 if (idx === dblclickSelectedIndex) {
-                    mesh.material.emissiveIntensity = 1.5
-                    mesh.material.emissive.setHex(0xffd700)
-                    mesh.scale.set(1.5, 1.5, 1.5)
+                    mesh.material.emissiveIntensity = 1.0
+                    mesh.scale.set(1.3, 1.3, 1.3)
                 } else {
                     mesh.material.emissiveIntensity = 0.5
-                    mesh.material.emissive.setHex(colors[nodes[idx].type])
                     mesh.scale.set(1, 1, 1)
                 }
                 if (glowMeshes[idx]) {
                     glowMeshes[idx].visible = true
                     if (idx === dblclickSelectedIndex) {
-                        glowMeshes[idx].material.opacity = 0.6
-                        glowMeshes[idx].material.color.setHex(0xffd700)
+                        glowMeshes[idx].material.opacity = 0.4
                     } else {
                         glowMeshes[idx].material.opacity = 0.15
-                        glowMeshes[idx].material.color.setHex(colors[nodes[idx].type])
                     }
                 }
             } else {
@@ -1365,8 +1081,6 @@ window.addEventListener("dblclick", e => {
             }
         }
         animateCamera()
-        
-        createExpandButtons(nodeIndex, connectedNodes)
     }
 })
 
@@ -1374,19 +1088,15 @@ window.addEventListener("keydown", e => {
     if (e.key === "Escape") {
         dblclickFocused = false
         dblclickSelectedIndex = -1
-        expandedNodes.clear()
-        clearExpandButtons()
         
         meshes.forEach((mesh, idx) => {
             mesh.visible = true
             mesh.material.opacity = 0.95
             mesh.material.emissiveIntensity = 0.5
-            mesh.material.emissive.setHex(colors[nodes[idx].type])
             mesh.scale.set(1, 1, 1)
             if (glowMeshes[idx]) {
                 glowMeshes[idx].visible = true
                 glowMeshes[idx].material.opacity = 0.15
-                glowMeshes[idx].material.color.setHex(colors[nodes[idx].type])
             }
         })
         labelObjs.forEach(label => label.visible = true)
@@ -1534,7 +1244,6 @@ function animate() {
         particle.scale.set(scale, scale, scale)
     })
     
-    updateExpandButtonPositions()
     updateHover()
     
     renderer.render(scene, camera)
@@ -1892,9 +1601,7 @@ function getNodeLevel(node) {
 }
 
 // 页面加载完成后初始化自定义下拉框
-document.addEventListener('DOMContentLoaded', () => {
-    initCustomSelects();
-});
+document.addEventListener('DOMContentLoaded', initCustomSelects);
 
 </script>
 </body>

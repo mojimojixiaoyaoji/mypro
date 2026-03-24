@@ -657,6 +657,7 @@
       border-radius: 12px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
       overflow-y: auto;
+      position: relative;
     }
 
     .modal-header {
@@ -666,6 +667,8 @@
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border);
       margin-bottom: 20px;
+      cursor: move;
+      user-select: none;
     }
 
     .modal-header h2 {
@@ -1675,7 +1678,14 @@
 
   // PRD模态弹窗控制
   function openPRDModal() {
-    document.getElementById('prdModal').style.display = 'block';
+    const modal = document.getElementById('prdModal');
+    const modalContent = modal.querySelector('.modal-content');
+    // 重置弹窗位置
+    modalContent.style.position = '';
+    modalContent.style.left = '';
+    modalContent.style.top = '';
+    modalContent.style.margin = '5% auto';
+    modal.style.display = 'block';
   }
 
   function closePRDModal() {
@@ -1689,6 +1699,7 @@
       closePRDModal();
     }
   }
+
 </script>
 </body>
   
@@ -1797,10 +1808,7 @@
           </table>
           
           <h2>6. 用户故事 + GWT 定义</h2>
-          <h3>6.1 用户故事规范</h3>
-          <p><strong>格式要求</strong>：作为 [角色]，我希望 [实现的功能/目标]，以便 [业务价值/用户收益]。</p>
-          <p><strong>核心原则</strong>：每个用户故事对应1-2个核心场景，配套GWT（Given-When-Then）定义，明确场景边界、前置条件、操作步骤及预期结果。</p>
-          <p><strong>补充说明</strong>：GWT定义需贴合实际业务场景，明确操作细节、响应时间、异常提示等关键信息。</p>
+
           
           <h3>6.2 用户故事 + GWT 定义</h3>
           <h4>6.2.1 生产管理人员</h4>
@@ -1984,37 +1992,7 @@
             <li>历史记录闭环：记录→展示→重查→管理</li>
           </ul>
           
-          <h2>12. 示例查询</h2>
-          <h3>12.1 总量查询</h3>
-          <ul>
-            <li>查询DCS数据采集总量</li>
-            <li>查询行业云今日采集总量</li>
-            <li>查询累计采集总量</li>
-          </ul>
-          
-          <h3>12.2 趋势分析</h3>
-          <ul>
-            <li>查看近半年趋势</li>
-            <li>近半年波动原因分析</li>
-            <li>近一年行业云数据采集量趋势</li>
-            <li>近半年河南区域采集情况</li>
-          </ul>
-          
-          <h3>12.3 区域对比</h3>
-          <ul>
-            <li>各区域采集量对比</li>
-            <li>查询北方/西南/新疆/云贵区域DCS采集量</li>
-          </ul>
-          
-          <h3>12.4 工厂明细</h3>
-          <ul>
-            <li>四川华蓥西南水泥</li>
-            <li>汪清北方水泥</li>
-            <li>白山北方水泥</li>
-            <li>新乡平原同力水泥</li>
-            <li>邓州中联水泥</li>
-            <li>玉山南方水泥</li>
-          </ul>
+
           
           <h2>13. 未来规划</h2>
           <h3>13.1 功能扩展</h3>
@@ -2024,16 +2002,69 @@
             <li>自动生成周期性分析报告</li>
             <li>接入更多DCS数据源</li>
           </ul>
-          
-          <h3>13.2 用户体验优化</h3>
-          <ul>
-            <li>深度移动端适配与触摸优化</li>
-            <li>支持主题、布局个性化</li>
-            <li>多人协作分析与分享</li>
-            <li>增强语音交互鲁棒性</li>
-          </ul>
         </div>
       </div>
     </div>
   </div>
+
+  <script>
+  // PRD弹窗拖动功能
+  (function() {
+    const modal = document.getElementById('prdModal');
+    const modalContent = modal.querySelector('.modal-content');
+    const modalHeader = modalContent.querySelector('.modal-header');
+    
+    let isDragging = false;
+    let startX, startY, offsetX, offsetY;
+    
+    modalHeader.addEventListener('mousedown', function(e) {
+      // 确保只在点击头部时才开始拖动
+      if (e.target === modalHeader || modalHeader.contains(e.target)) {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        // 获取当前弹窗的位置
+        const rect = modalContent.getBoundingClientRect();
+        offsetX = startX - rect.left;
+        offsetY = startY - rect.top;
+        
+        document.body.style.cursor = 'grabbing';
+        // 阻止默认行为，防止选中文本
+        e.preventDefault();
+      }
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+      
+      e.preventDefault();
+      
+      const newX = e.clientX - offsetX;
+      const newY = e.clientY - offsetY;
+      
+      // 限制弹窗不超出视窗
+      const maxX = window.innerWidth - modalContent.offsetWidth;
+      const maxY = window.innerHeight - modalContent.offsetHeight;
+      
+      const boundedX = Math.max(0, Math.min(newX, maxX));
+      const boundedY = Math.max(0, Math.min(newY, maxY));
+      
+      // 使用fixed定位，相对于视窗定位
+      modalContent.style.position = 'fixed';
+      modalContent.style.left = boundedX + 'px';
+      modalContent.style.top = boundedY + 'px';
+      modalContent.style.margin = '0';
+      // 设置z-index确保弹窗在最上层
+      modalContent.style.zIndex = '2001';
+    });
+    
+    document.addEventListener('mouseup', function() {
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.cursor = '';
+      }
+    });
+  })();
+  </script>
 </html>
